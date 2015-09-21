@@ -1,0 +1,187 @@
+
+    /*
+        generateHorizontalMatches and generateVerticalMatches are obsolete and should no longer be used
+     */
+    private HashMap<Position,HashSet<Position>> generateHorizontalMatches(HashMap<Position,Position> positionToStartingPosition){
+        HashMap<Attribute,Integer> matchWindow = new HashMap<Attribute, Integer>();
+        //HashSet<HashSet<Position>> matches = new HashSet<>();
+        HashMap<Position,HashSet<Position>> positionToMatchMap = new HashMap<>();
+        //HashMap<Position,Position> positionToStartingPosition = new HashMap<>();
+        for (int row = 0;row<getRows();row++){
+            matchWindow.clear();
+            for (int col=0;col<getColumns();col++){
+                if (col-Board.MATCH>=0){
+                    Attribute eldestAttribute=getOrb(row,col-Board.MATCH).getAttribute();
+                    if (matchWindow.remove(eldestAttribute,1)==false) {
+                        matchWindow.replace(eldestAttribute,matchWindow.get(eldestAttribute)-1);
+                    }
+                }
+                Integer existingValue;
+                if ((existingValue = matchWindow.putIfAbsent(getOrb(row,col).getAttribute(),1))!=null){
+                    matchWindow.replace(getOrb(row,col).getAttribute(),1+existingValue);
+                }
+                // Now test for a 3 match, there should only be size==1 in this map
+                if (matchWindow.size()==1 && matchWindow.containsKey(Attribute.CLEARED)==false){
+                    // found a match
+                    Attribute matchedAttribute = matchWindow.keySet().toArray(new Attribute[0])[0];
+                    Position recentPosition = new Position(row,col-1);
+                    if (positionToStartingPosition.containsKey(recentPosition)) {
+                        // Append the newest orb to the existing match
+                        Position startingPosition = positionToStartingPosition.get(recentPosition);
+                        positionToMatchMap.get(startingPosition).add(new Position(row, col));
+                    } else {
+                        // Start a new match, with the starting orb as the identifier
+                        HashSet<Position> match = new HashSet<>();
+                        Position startingPosition = new Position(row,col-2);
+                        for (int i=0;i<3;i++){
+                            Position pos = new Position(row,col-i);
+                            match.add(pos);
+                            positionToStartingPosition.put(pos,startingPosition);
+                        }
+                        positionToMatchMap.put(startingPosition,match);
+                    }
+                    // Now matches has a set of all matchsets from this row.
+                }
+            }
+        }
+        return mergeHorizontalMatches(positionToStartingPosition, positionToMatchMap);
+    } // TODO Refactor this to only use the leftmost orb of a match to identify the match! done
+    private HashMap<Position,HashSet<Position>> generateVerticalMatches(HashMap<Position,Position> positionToStartingPosition){
+        HashMap<Attribute,Integer> matchWindow = new HashMap<Attribute, Integer>();
+        //HashSet<HashSet<Position>> matches = new HashSet<>();
+        HashMap<Position,HashSet<Position>> positionToMatchMap = new HashMap<>();
+        //HashMap<Position,Position> positionToStartingPosition = new HashMap<>();
+        for (int col = 0;col<getColumns();col++){
+            matchWindow.clear();
+            for (int row=0;row<getRows();row++){
+                if (row-Board.MATCH>=0){
+                    Attribute eldestAttribute=getOrb(row-Board.MATCH,col).getAttribute();
+                    if (matchWindow.remove(eldestAttribute,1)==false) {
+                        matchWindow.replace(eldestAttribute,matchWindow.get(eldestAttribute)-1);
+                    }
+                }
+                Integer existingValue;
+                if ((existingValue = matchWindow.putIfAbsent(getOrb(row,col).getAttribute(),1))!=null){
+                    matchWindow.replace(getOrb(row,col).getAttribute(),1+existingValue);
+                }
+                // Now test for a 3 match, there should only be size==1 in this map
+                if (matchWindow.size()==1 && matchWindow.containsKey(Attribute.CLEARED)==false){
+                    // found a match
+                    Attribute matchedAttribute = matchWindow.keySet().toArray(new Attribute[0])[0];
+                    Position recentPosition = new Position(row-1,col);
+                    if (positionToStartingPosition.containsKey(recentPosition)) {
+                        // Append the newest orb to the existing match
+                        Position startingPosition = positionToStartingPosition.get(recentPosition);
+                        positionToMatchMap.get(startingPosition).add(new Position(row, col));
+                    } else {
+                        // Start a new match, with the starting orb as the identifier
+                        HashSet<Position> match = new HashSet<>();
+                        Position startingPosition = new Position(row-2,col);
+                        for (int i=0;i<3;i++){
+                            Position pos = new Position(row-i,col);
+                            match.add(pos);
+                            positionToStartingPosition.put(pos,startingPosition);
+                        }
+                        positionToMatchMap.put(startingPosition,match);
+                    }
+                    // Now matches has a set of all matchsets from this column.
+                }
+            }
+        }
+        return mergeVerticalMatches(positionToStartingPosition, positionToMatchMap);
+    }
+    private HashMap<Position,HashSet<Position>> mergeHorizontalMatches(HashMap<Position,Position> startingPositions,
+                                                                       HashMap<Position,HashSet<Position>> horizontals){
+        HashMap<Position,HashSet<Position>> mergedHorizontals = new HashMap<>();
+        // TODO Merge the two hashmaps together, taking note of linked orb rules
+        for (Position pos:horizontals.keySet()) {
+            //Test to see if pos match already is adjacent to a match in mergedHorizontals
+            Position newStartingPosition = startingPositions.get(pos);
+            for (Position matchPos:horizontals.get(pos)) {
+                if (startingPositions.containsKey(matchPos.up()) && comparePositionAttributes(matchPos,matchPos.up())) {
+                    newStartingPosition = startingPositions.get(matchPos.up());
+                    break;
+                }
+                if (startingPositions.containsKey(matchPos.down()) && comparePositionAttributes(matchPos,matchPos.down())) {
+                    newStartingPosition = startingPositions.get(matchPos.down());
+                    break;
+                }
+            }
+            if (mergedHorizontals.containsKey(newStartingPosition)) {
+                for (Position matchPos:horizontals.get(pos)) {
+                    startingPositions.replace(matchPos,newStartingPosition);
+                }
+                mergedHorizontals.get(newStartingPosition).addAll(horizontals.get(pos));
+            } else {
+                // new match, not adjacent to anything previously added
+                mergedHorizontals.put(newStartingPosition,horizontals.get(pos));
+            }
+        }
+        return mergedHorizontals;
+    }
+    private HashMap<Position,HashSet<Position>> mergeVerticalMatches(HashMap<Position,Position> startingPositions,
+                                                                       HashMap<Position,HashSet<Position>> verticals){
+        HashMap<Position,HashSet<Position>> mergedVerticals = new HashMap<>();
+        // TODO Merge the two hashmaps together, taking note of linked orb rules
+        for (Position pos:verticals.keySet()) {
+            //Test to see if pos match already is adjacent to a match in mergedVerticals
+            Position newStartingPosition = startingPositions.get(pos);
+            for (Position matchPos:verticals.get(pos)) {
+                if (startingPositions.containsKey(matchPos.left()) && comparePositionAttributes(matchPos,matchPos.left())) {
+                    newStartingPosition = startingPositions.get(matchPos.left());
+                    break;
+                }
+                if (startingPositions.containsKey(matchPos.right()) && comparePositionAttributes(matchPos,matchPos.right())) {
+                    newStartingPosition = startingPositions.get(matchPos.right());
+                    break;
+                }
+            }
+            if (mergedVerticals.containsKey(newStartingPosition)) {
+                for (Position matchPos:verticals.get(pos)) {
+                    startingPositions.replace(matchPos,newStartingPosition);
+                }
+                mergedVerticals.get(newStartingPosition).addAll(verticals.get(pos));
+            } else {
+                // new match, not adjacent to anything previously added
+                mergedVerticals.put(newStartingPosition,verticals.get(pos));
+            }
+        }
+        return mergedVerticals;
+    }
+    public void generateMatches() {
+        HashMap<Position,Position> positionToStartingPositionHorizontal = new HashMap<>();
+        HashMap<Position,Position> positionToStartingPositionVertical = new HashMap<>();
+        HashMap<Position,HashSet<Position>> positionToMatchMapHorizontal = generateHorizontalMatches(positionToStartingPositionHorizontal);
+        HashMap<Position,HashSet<Position>> positionToMatchMapVertical = generateVerticalMatches(positionToStartingPositionVertical);
+        HashMap<Position,Position> positionToStartingPosition = positionToStartingPositionHorizontal;
+        for (Position startingPos:positionToMatchMapVertical.keySet()) {
+            //Test to see if startingPos match is already adjacent to a horizontal match
+            Position newStartingPosition = startingPos;
+            boolean needNewStartingPosition = true;
+            HashSet<Position> allIntersectingStartingPositions = new HashSet<>();
+            for (Position matchPos:positionToMatchMapVertical.get(startingPos)) {
+                if (positionToStartingPosition.containsKey(matchPos.left()) && comparePositionAttributes(matchPos,matchPos.left())) {
+                    if (needNewStartingPosition)
+                        newStartingPosition = positionToStartingPosition.get(matchPos.left());
+                    allIntersectingStartingPositions.add(positionToStartingPosition.get(matchPos.left()));
+                }
+                if (positionToStartingPosition.containsKey(matchPos.right()) && comparePositionAttributes(matchPos,matchPos.right())) {
+                    if (needNewStartingPosition)
+                        newStartingPosition = positionToStartingPosition.get(matchPos.right());
+                    allIntersectingStartingPositions.add(positionToStartingPosition.get(matchPos.right()));
+                }
+                if (positionToStartingPosition.containsKey(matchPos.up()) && comparePositionAttributes(matchPos,matchPos.up())) {
+                    if (needNewStartingPosition)
+                        newStartingPosition = positionToStartingPosition.get(matchPos.up());
+                    allIntersectingStartingPositions.add(positionToStartingPosition.get(matchPos.up()));
+                }
+                if (positionToStartingPosition.containsKey(matchPos.down()) && comparePositionAttributes(matchPos,matchPos.down())) {
+                    if (needNewStartingPosition)
+                        newStartingPosition = positionToStartingPosition.get(matchPos.down());
+                    allIntersectingStartingPositions.add(positionToStartingPosition.get(matchPos.down()));
+                }
+            }
+            // TODO do something with where you join up all the intersecting things together
+
+        }
+    }
